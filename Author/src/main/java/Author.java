@@ -20,6 +20,7 @@ public class Author {
     private String pathToCommunicationDirectory;
     private String password;
     private byte[] encryptedPrivateKey;
+    private byte[] publicKey;
 
     public Author(String pathToCommunicationDirectory, String password) {
         this.pathToCommunicationDirectory = pathToCommunicationDirectory;
@@ -59,7 +60,7 @@ public class Author {
     }
 
     private boolean fileOrDirectoryExists(String filePath){
-        return Files.exists(filePath);
+        return Files.exists(Paths.get(filePath));
     }
     // +======+
 
@@ -79,8 +80,27 @@ public class Author {
         this.password = password;
     }
 
+    public byte[] getEncryptedPrivateKey() {
+        return encryptedPrivateKey;
+    }
+
+    public void setEncryptedPrivateKey(byte[] encryptedPrivateKey) {
+        this.encryptedPrivateKey = encryptedPrivateKey;
+    }
+
+    public byte[] getPublicKey() {
+        return publicKey;
+    }
+
+    public void setPublicKey(byte[] publicKey) {
+        this.publicKey = publicKey;
+    }
+
     public void encryptPrivateKey(PrivateKey privateKey){
-        
+        PasswordEncryptedInformation encryptedPrivateKey = new PasswordEncryptedInformation("AES", "CBC", "PKCS5Padding", 65536, 256);
+        SecretKey secretKey = encryptedPrivateKey.createSecretKey(getPassword().toCharArray());
+        encryptedPrivateKey.encrypt(secretKey, privateKey.getEncoded());
+        setEncryptedPrivateKey(encryptedPrivateKey.getEncryptedInformation());
     }
 
     public void createDatabase() {
@@ -88,7 +108,7 @@ public class Author {
         String databaseName = "database";
         // sql to create table
         //String sql = "DROP TABLE licenses; CREATE TABLE IF NOT EXISTS licenses (cc_certificate BLOB NOT NULL);";
-        String sql = "CREATE TABLE IF NOT EXISTS licenses (cc_certificate BLOB NOT NULL, expiration_date TIMESTAMP, NOT NULL);";
+        String sql = "CREATE TABLE IF NOT EXISTS licenses(cc_certificate BLOB NOT NULL, expiration_date TIMESTAMP NOT NULL);";
         try {
             // create database
             printCreatingMessage("Database");
@@ -116,13 +136,12 @@ public class Author {
         assert keyGenerator != null;
         keyGenerator.initialize(2048);
         KeyPair keyPair = keyGenerator.generateKeyPair();
+        setPublicKey(keyPair.getPublic().getEncoded());
         printCreatedSuccessfullyMessage("Key Pair");
         // protect private key
-        printCreatingMessage("Protection for the Private Key");
-        if(fileOrDirectoryExists()){
-            encryptPrivateKey();
-        }
-        printCreatedSuccessfullyMessage("Protection for the Private Key");
+        printCreatingMessage("Encryption for the Private Key");
+        encryptPrivateKey(keyPair.getPrivate());
+        printCreatedSuccessfullyMessage("Encryption for the Private Key");
 
     }
 
@@ -145,10 +164,14 @@ public class Author {
         createDatabase();
     }
 
-    public void start() throws InterruptedException, IOException {
+    public void start() {
         while (true) {
             // sleep for 1 sec
-            TimeUnit.SECONDS.sleep(1);
+            try {
+                TimeUnit.SECONDS.sleep(1);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
             System.out.println(">[AUTHOR] Checking if there is new license requests...");
             //check if file format is in the folder
             ArrayList<byte[]> licenseRequest = getLicenseRequestsInCommunicationDirectory();

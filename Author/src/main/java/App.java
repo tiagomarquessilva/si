@@ -1,8 +1,10 @@
-import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.concurrent.TimeUnit;
 
 public class App {
     public static void main(String[] args) {
-        Author a = new Author("../communication_Author_Library");
-        a.start();
+        Author a = new Author("../communication_Author_Library", "password");
+        a.init();
     }
 }
