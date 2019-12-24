@@ -63,10 +63,10 @@ public class License implements Serializable {
     private int numberOfMachineIdentifiersThatCanChange;
     private LicenseParameters licenseParameters;
 
-    public License(byte[] authorSignature, long hoursUntilExpiration, int numberOfMachineIdentifiersThatCanChange, byte[][] machineIdentifiers, byte[] applicationHash, byte[] ccCertificate) {
-        this.authorSignature = authorSignature;
+    public License(PrivateKey privateKey, long hoursUntilExpiration, int numberOfMachineIdentifiersThatCanChange, byte[][] machineIdentifiers, byte[] applicationHash, byte[] ccCertificate) {
         this.licenseParameters = new LicenseParameters(LocalDateTime.now().plusHours(hoursUntilExpiration), machineIdentifiers, applicationHash, ccCertificate);
         this.numberOfMachineIdentifiersThatCanChange = numberOfMachineIdentifiersThatCanChange;
+        this.authorSignature = signLicense(privateKey);
     }
 
     // +===+ Helper Methods +==+
@@ -83,6 +83,18 @@ public class License implements Serializable {
         return bos.toByteArray();
     }
 
+    private byte[] signLicense(PrivateKey privateKey){
+        byte[] signedLicenseParameters = null;
+        try {
+            Signature signature = Signature.getInstance("SHA256withRSA");
+            signature.initSign(privateKey);
+            signature.update(convertToByteArray(getLicenseParameters()));
+            signedLicenseParameters = signature.sign();
+        } catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException e) {
+            e.printStackTrace();
+        }
+        return signedLicenseParameters;
+    }
     // +======+
     public byte[] getAuthorSignature() {
         return authorSignature;
@@ -136,11 +148,15 @@ public class License implements Serializable {
             }
         }
 
-        return numberOfIdentifiersNotFound >= 2;
+        return numberOfIdentifiersNotFound >= getNumberOfMachineIdentifiersThatCanChange();
     }
 
     public boolean isValidApplication(byte[] currentApplicationHash){
         return Arrays.equals(getLicenseParameters().getApplicationHash(), currentApplicationHash);
+    }
+
+    public boolean isValidLicense(byte[] publicKeyBytes, byte[][] currentMachineIdentifiers, byte[] currentApplicationHash){
+        return isValidAuthorSignature(publicKeyBytes) && isExpired() && isValidMachine(currentMachineIdentifiers) && isValidApplication(currentApplicationHash);
     }
 
     public byte[] toByteArray() {

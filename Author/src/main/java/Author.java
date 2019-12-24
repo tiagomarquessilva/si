@@ -1,18 +1,13 @@
 import javax.crypto.SecretKey;
-import javax.crypto.SecretKeyFactory;
-import javax.crypto.spec.PBEKeySpec;
-import javax.crypto.spec.SecretKeySpec;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.*;
-import java.security.spec.KeySpec;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
 public class Author {
@@ -97,7 +92,7 @@ public class Author {
     }
 
     public void encryptPrivateKey(PrivateKey privateKey){
-        PasswordEncryptedInformation encryptedPrivateKey = new PasswordEncryptedInformation("AES", "CBC", "PKCS5Padding", 65536, 256);
+        PasswordBasedEncryption encryptedPrivateKey = new PasswordBasedEncryption("AES", "CBC", "PKCS5Padding", 65536, 256);
         SecretKey secretKey = encryptedPrivateKey.createSecretKey(getPassword().toCharArray());
         encryptedPrivateKey.encrypt(secretKey, privateKey.getEncoded());
         setEncryptedPrivateKey(encryptedPrivateKey.getEncryptedInformation());

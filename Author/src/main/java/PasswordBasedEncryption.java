@@ -8,10 +8,10 @@ import java.security.spec.InvalidKeySpecException;
 import java.security.spec.KeySpec;
 import java.util.Random;
 
-public class PasswordEncryptedInformation extends SymmetricEncryptedInformation {
+public class PasswordBasedEncryption extends SymmetricEncryption {
     private byte[] salt;
 
-    public PasswordEncryptedInformation(String encryptionAlgorithm, String blockChainingMode, String padding, int iterationCount, int keyLength) {
+    public PasswordBasedEncryption(String encryptionAlgorithm, String blockChainingMode, String padding, int iterationCount, int keyLength) {
         super(encryptionAlgorithm, blockChainingMode, padding, iterationCount, keyLength);
         this.salt = createSalt();
     }

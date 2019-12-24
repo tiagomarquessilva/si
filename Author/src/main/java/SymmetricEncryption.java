@@ -4,7 +4,7 @@ import java.security.*;
 import java.security.spec.InvalidParameterSpecException;
 import java.util.Random;
 
-public class SymmetricEncryptedInformation {
+public class SymmetricEncryption {
     private String encryptionAlgorithm;
     private String blockChainingMode;
     private String padding;
@@ -13,7 +13,7 @@ public class SymmetricEncryptedInformation {
     private byte[] initialVector;
     private byte[] encryptedInformation;
 
-    public SymmetricEncryptedInformation(String encryptionAlgorithm, String blockChainingMode, String padding, int iterationCount, int keyLength) {
+    public SymmetricEncryption(String encryptionAlgorithm, String blockChainingMode, String padding, int iterationCount, int keyLength) {
         this.encryptionAlgorithm = encryptionAlgorithm;
         this.blockChainingMode = blockChainingMode;
         this.padding = padding;
@@ -86,6 +86,7 @@ public class SymmetricEncryptedInformation {
         } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
         }
+        assert keyFactory != null;
         keyFactory.init(getKeyLength());
         return keyFactory.generateKey();
     }
