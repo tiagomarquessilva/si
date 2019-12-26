@@ -1,3 +1,6 @@
+import cryptography.PasswordBasedEncryption;
+import license.LicenseRequest;
+
 import javax.crypto.SecretKey;
 import java.io.*;
 import java.nio.file.Files;
@@ -23,7 +26,6 @@ public class Author {
     }
 
     // +===+ Helper Methods +===+
-
     private void printMessage(String message) {
         System.out.println(">[AUTHOR]" + message);
     }
@@ -59,6 +61,7 @@ public class Author {
     }
     // +======+
 
+    // +===+ Getters and Setters +===+
     public String getPathToCommunicationDirectory() {
         return pathToCommunicationDirectory;
     }
@@ -90,7 +93,9 @@ public class Author {
     public void setPublicKey(byte[] publicKey) {
         this.publicKey = publicKey;
     }
+    // +======+
 
+    // +===+ Class Methods +===+
     public void encryptPrivateKey(PrivateKey privateKey){
         PasswordBasedEncryption encryptedPrivateKey = new PasswordBasedEncryption("AES", "CBC", "PKCS5Padding", 65536, 256);
         SecretKey secretKey = encryptedPrivateKey.createSecretKey(getPassword().toCharArray());
@@ -150,6 +155,10 @@ public class Author {
             file.delete();
         }
         return licenseRequestsBytes;
+    }
+
+    public void processLicenseRequest(LicenseRequest licenseRequest){
+        
     }
 
     public void init() {

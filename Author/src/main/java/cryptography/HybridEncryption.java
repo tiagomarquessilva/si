@@ -1,31 +1,30 @@
+package cryptography;
+
 import javax.crypto.*;
 import javax.crypto.spec.SecretKeySpec;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.ObjectInputStream;
+import java.io.Serializable;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 
-public class EncryptedLicense {
-    private PublicKey userPublicKey;
+public class HybridEncryption implements Serializable {
+    private PublicKey publicKey;
     private SymmetricEncryption symmetricEncryption;
     private byte[] encryptedSymmetricKey;
-    private byte[] encryptedLicense;
+    private byte[] encryptedInformation;
 
-    public EncryptedLicense(PublicKey userPublicKey, License licenseToEncrypt) {
-        this.userPublicKey = userPublicKey;
+    public HybridEncryption(PublicKey publicKey) {
+        this.publicKey = publicKey;
         this.symmetricEncryption = new SymmetricEncryption("AES", "CBC", "PKCS5Padding", 65536, 256);
-        encryptLicense(licenseToEncrypt);
     }
 
-    public PublicKey getUserPublicKey() {
-        return userPublicKey;
+    public PublicKey getPublicKey() {
+        return publicKey;
     }
 
-    public void setUserPublicKey(PublicKey userPublicKey) {
-        this.userPublicKey = userPublicKey;
+    public void setPublicKey(PublicKey publicKey) {
+        this.publicKey = publicKey;
     }
 
     public SymmetricEncryption getSymmetricEncryption() {
@@ -44,15 +43,15 @@ public class EncryptedLicense {
         this.encryptedSymmetricKey = encryptedSymmetricKey;
     }
 
-    public byte[] getEncryptedLicense() {
-        return encryptedLicense;
+    public byte[] getEncryptedInformation() {
+        return encryptedInformation;
     }
 
-    public void setEncryptedLicense(byte[] encryptedLicense) {
-        this.encryptedLicense = encryptedLicense;
+    public void setEncryptedInformation(byte[] encryptedInformation) {
+        this.encryptedInformation = encryptedInformation;
     }
 
-    public License decryptLicense(PrivateKey privateKey){
+    public byte[] decrypt(PrivateKey privateKey){
         //decrypt symmetric key with user public key
         SecretKey symmetricKey = null;
         try {
@@ -64,7 +63,8 @@ public class EncryptedLicense {
         }
 
         // decrypt license with symmetric encryption
-        byte[] licenseBytes = getSymmetricEncryption().decrypt(symmetricKey);
+        return getSymmetricEncryption().decrypt(symmetricKey);
+        /*
         License license = null;
         try {
             ObjectInputStream objectInputStream = new ObjectInputStream(new ByteArrayInputStream(licenseBytes));
@@ -74,18 +74,19 @@ public class EncryptedLicense {
             e.printStackTrace();
         }
         return license;
+         */
     }
 
-    public void encryptLicense(License licenseToEncrypt){
+    public void encrypt(byte[] vanillaInformation){
         // encrypt license with symmetric encryption
         SecretKey symmetricKey = getSymmetricEncryption().createSecretKey();
-        getSymmetricEncryption().encrypt(symmetricKey, licenseToEncrypt.toByteArray());
-        setEncryptedLicense(getSymmetricEncryption().getEncryptedInformation());
+        getSymmetricEncryption().encrypt(symmetricKey, vanillaInformation);
+        setEncryptedInformation(getSymmetricEncryption().getEncryptedInformation());
 
         //encrypt symmetric key with user public key
         try {
             Cipher symmetricKeyEncryption = Cipher.getInstance("RSA");
-            symmetricKeyEncryption.init(Cipher.ENCRYPT_MODE, getUserPublicKey());
+            symmetricKeyEncryption.init(Cipher.ENCRYPT_MODE, getPublicKey());
             setEncryptedSymmetricKey(symmetricKeyEncryption.doFinal(symmetricKey.getEncoded()));
         } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException | IllegalBlockSizeException | BadPaddingException e) {
             e.printStackTrace();

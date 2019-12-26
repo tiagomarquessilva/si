@@ -1,3 +1,7 @@
+package license;
+
+import license.LicenseParameters;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
@@ -7,64 +11,15 @@ import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
 import java.time.LocalDateTime;
 import java.util.Arrays;
-import java.util.HashMap;
 
 public class License implements Serializable {
-
-    // +===+ Helper Class +===+
-    private static class LicenseParameters implements Serializable {
-        private LocalDateTime expirationDate;
-        private byte[][] machineIdentifiers;
-        private byte[] applicationHash;
-        private byte[] ccCertificate;
-
-        public LicenseParameters(LocalDateTime expirationDate, byte[][] machineIdentifiers, byte[] applicationHash, byte[] ccCertificate) {
-            this.expirationDate = expirationDate;
-            this.machineIdentifiers = machineIdentifiers;
-            this.applicationHash = applicationHash;
-            this.ccCertificate = ccCertificate;
-        }
-
-        public LocalDateTime getExpirationDate() {
-            return expirationDate;
-        }
-
-        public void setExpirationDate(LocalDateTime expirationDate) {
-            this.expirationDate = expirationDate;
-        }
-
-        public byte[][] getMachineIdentifiers() {
-            return machineIdentifiers;
-        }
-
-        public void setMachineIdentifiers(byte[][] machineIdentifiers) {
-            this.machineIdentifiers = machineIdentifiers;
-        }
-
-        public byte[] getApplicationHash() {
-            return applicationHash;
-        }
-
-        public void setApplicationHash(byte[] applicationHash) {
-            this.applicationHash = applicationHash;
-        }
-
-        public byte[] getCcCertificate() {
-            return ccCertificate;
-        }
-
-        public void setCcCertificate(byte[] ccCertificate) {
-            this.ccCertificate = ccCertificate;
-        }
-    }
-    // +======+
 
     private byte[] authorSignature;
     private int numberOfMachineIdentifiersThatCanChange;
     private LicenseParameters licenseParameters;
 
-    public License(PrivateKey privateKey, long hoursUntilExpiration, int numberOfMachineIdentifiersThatCanChange, byte[][] machineIdentifiers, byte[] applicationHash, byte[] ccCertificate) {
-        this.licenseParameters = new LicenseParameters(LocalDateTime.now().plusHours(hoursUntilExpiration), machineIdentifiers, applicationHash, ccCertificate);
+    public License(LicenseParameters licenseParameters, PrivateKey privateKey, int numberOfMachineIdentifiersThatCanChange) {
+        this.licenseParameters = licenseParameters;
         this.numberOfMachineIdentifiersThatCanChange = numberOfMachineIdentifiersThatCanChange;
         this.authorSignature = signLicense(privateKey);
     }
@@ -155,8 +110,8 @@ public class License implements Serializable {
         return Arrays.equals(getLicenseParameters().getApplicationHash(), currentApplicationHash);
     }
 
-    public boolean isValidLicense(byte[] publicKeyBytes, byte[][] currentMachineIdentifiers, byte[] currentApplicationHash){
-        return isValidAuthorSignature(publicKeyBytes) && isExpired() && isValidMachine(currentMachineIdentifiers) && isValidApplication(currentApplicationHash);
+    public boolean isValidLicense(byte[] userPublicKeyBytes, byte[][] currentMachineIdentifiers, byte[] currentApplicationHash){
+        return isValidAuthorSignature(userPublicKeyBytes) && isExpired() && isValidMachine(currentMachineIdentifiers) && isValidApplication(currentApplicationHash);
     }
 
     public byte[] toByteArray() {
