@@ -10,6 +10,7 @@ que apenas são executadas pelos donos legítimos das mesmas. Uma descrição ma
 ## Tecnologias, Protocolos, Software, Etc. Usados
 
 - Java;
+- JDBC;
 - Java Security;
 - Cartão de Cidadão Português;
 
