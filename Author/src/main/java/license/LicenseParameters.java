@@ -1,15 +1,16 @@
 package license;
 
 import java.io.Serializable;
+import java.security.cert.Certificate;
 import java.time.LocalDateTime;
 
 public class LicenseParameters implements Serializable {
     private LocalDateTime expirationDate;
     private byte[][] machineIdentifiers;
     private byte[] applicationHash;
-    private byte[] ccCertificate;
+    private Certificate ccCertificate;
 
-    public LicenseParameters(LocalDateTime expirationDate, byte[][] machineIdentifiers, byte[] applicationHash, byte[] ccCertificate) {
+    public LicenseParameters(LocalDateTime expirationDate, byte[][] machineIdentifiers, byte[] applicationHash, Certificate ccCertificate) {
         this.expirationDate = expirationDate;
         this.machineIdentifiers = machineIdentifiers;
         this.applicationHash = applicationHash;
@@ -40,11 +41,11 @@ public class LicenseParameters implements Serializable {
         this.applicationHash = applicationHash;
     }
 
-    public byte[] getCcCertificate() {
+    public Certificate getCcCertificate() {
         return ccCertificate;
     }
 
-    public void setCcCertificate(byte[] ccCertificate) {
+    public void setCcCertificate(Certificate ccCertificate) {
         this.ccCertificate = ccCertificate;
     }
 }

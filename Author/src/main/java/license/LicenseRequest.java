@@ -1,50 +1,88 @@
 package license;
 
-import license.LicenseParameters;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
+import java.security.*;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateEncodingException;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.X509EncodedKeySpec;
 
-public class LicenseRequest {
-    private LicenseParameters licenseParameters;
-    private byte[] userPublicKey;
-    private byte[] signedUserPublicKey;
-    private byte[] signedUserCCCertificate;
+public class LicenseRequest implements Serializable{
+    private LicenseRequestParameters licenseRequestParameters;
+    private byte[] userSignedLicenseRequestParameters;
 
-    public LicenseRequest(LicenseParameters licenseParameters, byte[] userPublicKey, byte[] signedUserPublicKey, byte[] signedUserCCCertificate) {
-        this.licenseParameters = licenseParameters;
-        this.userPublicKey = userPublicKey;
-        this.signedUserPublicKey = signedUserPublicKey;
-        this.signedUserCCCertificate = signedUserCCCertificate;
-
+    public LicenseRequest(LicenseRequestParameters licenseRequestParameters, PrivateKey userPrivateKey) {
+        this.licenseRequestParameters = licenseRequestParameters;
+        this.userSignedLicenseRequestParameters = signLicenseRequest(userPrivateKey);
     }
 
-    public LicenseParameters getLicenseParameters() {
-        return licenseParameters;
+    // +===+ Helper Methods +==+
+    private byte[] convertToByteArray(Object objectToConvert) {
+        ByteArrayOutputStream bos = null;
+        try {
+            bos = new ByteArrayOutputStream();
+            ObjectOutputStream os = new ObjectOutputStream(bos);
+            os.writeObject(objectToConvert);
+            os.flush();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return bos.toByteArray();
     }
 
-    public void setLicenseParameters(LicenseParameters licenseParameters) {
-        this.licenseParameters = licenseParameters;
+    private byte[] signLicenseRequest(PrivateKey privateKey){
+        byte[] signedLicenseRequestParameters = null;
+        try {
+            Signature signature = Signature.getInstance("SHA256withRSA");
+            signature.initSign(privateKey);
+            signature.update(convertToByteArray(getLicenseRequestParameters()));
+            signedLicenseRequestParameters = signature.sign();
+        } catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException e) {
+            e.printStackTrace();
+        }
+        return signedLicenseRequestParameters;
+    }
+    // +======+
+
+    // +===+ Getters and Setters +===+
+
+    // +===+ Getters and Setters +===+
+    public LicenseRequestParameters getLicenseRequestParameters() {
+        return licenseRequestParameters;
     }
 
-    public byte[] getUserPublicKey() {
-        return userPublicKey;
+    public void setLicenseRequestParameters(LicenseRequestParameters licenseRequestParameters) {
+        this.licenseRequestParameters = licenseRequestParameters;
     }
 
-    public void setUserPublicKey(byte[] userPublicKey) {
-        this.userPublicKey = userPublicKey;
+    public byte[] getUserSignedLicenseRequestParameters() {
+        return userSignedLicenseRequestParameters;
     }
 
-    public byte[] getSignedUserPublicKey() {
-        return signedUserPublicKey;
+    public void setUserSignedLicenseRequestParameters(byte[] userSignedLicenseRequestParameters) {
+        this.userSignedLicenseRequestParameters = userSignedLicenseRequestParameters;
+    }
+    // +======+
+
+    // +===+ Class methods +===+
+    public boolean isValidUserSignature() {
+        boolean validSignature = false;
+        try {
+            Signature signature = Signature.getInstance("SHA256withRSA");
+            signature.initVerify(getLicenseRequestParameters().getUserPublicKey());
+            signature.update(convertToByteArray(getLicenseRequestParameters()));
+            validSignature = signature.verify(getUserSignedLicenseRequestParameters());
+        } catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException e) {
+            e.printStackTrace();
+        }
+        return validSignature;
     }
 
-    public void setSignedUserPublicKey(byte[] signedUserPublicKey) {
-        this.signedUserPublicKey = signedUserPublicKey;
+    public boolean isValidLicenseRequest(){
+        return isValidUserSignature();
     }
-
-    public byte[] getSignedUserCCCertificate() {
-        return signedUserCCCertificate;
-    }
-
-    public void setSignedUserCCCertificate(byte[] signedUserCCCertificate) {
-        this.signedUserCCCertificate = signedUserCCCertificate;
-    }
+    // +======+
 }

@@ -1,4 +1,7 @@
+import cryptography.HybridEncryption;
 import cryptography.PasswordBasedEncryption;
+import license.License;
+import license.LicenseParameters;
 import license.LicenseRequest;
 
 import javax.crypto.SecretKey;
@@ -10,6 +13,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
 
@@ -19,10 +23,12 @@ public class Author {
     private String password;
     private byte[] encryptedPrivateKey;
     private byte[] publicKey;
+    private int hoursUntilLicenseExpires;
 
-    public Author(String pathToCommunicationDirectory, String password) {
+    public Author(String pathToCommunicationDirectory, String password, int hoursUntilLicenseExpires) {
         this.pathToCommunicationDirectory = pathToCommunicationDirectory;
         this.password = password;
+        this.hoursUntilLicenseExpires = hoursUntilLicenseExpires;
     }
 
     // +===+ Helper Methods +===+
@@ -38,8 +44,21 @@ public class Author {
         printMessage(whatWhasCreated + " created successfully");
     }
 
+    private byte[] convertToByteArray(Object objectToConvert) {
+        ByteArrayOutputStream bos = null;
+        try {
+            bos = new ByteArrayOutputStream();
+            ObjectOutputStream os = new ObjectOutputStream(bos);
+            os.writeObject(objectToConvert);
+            os.flush();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return bos.toByteArray();
+    }
+
     private byte[] readFromFile(File file) {
-        byte[] content = new byte[Math.toIntExact(file.length())];
+        byte[] content = null;
         try {
             content = Files.readAllBytes(Paths.get(file.getAbsolutePath()));
         } catch (IOException e) {
@@ -56,7 +75,7 @@ public class Author {
         }
     }
 
-    private boolean fileOrDirectoryExists(String filePath){
+    private boolean fileOrDirectoryExists(String filePath) {
         return Files.exists(Paths.get(filePath));
     }
     // +======+
@@ -93,10 +112,19 @@ public class Author {
     public void setPublicKey(byte[] publicKey) {
         this.publicKey = publicKey;
     }
+
+    public int getHoursUntilLicenseExpires() {
+        return hoursUntilLicenseExpires;
+    }
+
+    public void setHoursUntilLicenseExpires(int hoursUntilLicenseExpires) {
+        this.hoursUntilLicenseExpires = hoursUntilLicenseExpires;
+    }
+
     // +======+
 
     // +===+ Class Methods +===+
-    public void encryptPrivateKey(PrivateKey privateKey){
+    public void encryptPrivateKey(PrivateKey privateKey) {
         PasswordBasedEncryption encryptedPrivateKey = new PasswordBasedEncryption("AES", "CBC", "PKCS5Padding", 65536, 256);
         SecretKey secretKey = encryptedPrivateKey.createSecretKey(getPassword().toCharArray());
         encryptedPrivateKey.encrypt(secretKey, privateKey.getEncoded());
@@ -105,19 +133,24 @@ public class Author {
 
     public void createDatabase() {
         // database name
-        String databaseName = "database";
-        // sql to create table
-        //String sql = "DROP TABLE licenses; CREATE TABLE IF NOT EXISTS licenses (cc_certificate BLOB NOT NULL);";
-        String sql = "CREATE TABLE IF NOT EXISTS licenses(cc_certificate BLOB NOT NULL, expiration_date TIMESTAMP NOT NULL);";
+        String databasePath = "database/database.db";
         try {
             // create database
             printCreatingMessage("Database");
-            Connection databaseConnection = DriverManager.getConnection("jdbc:sqlite:" + databaseName + ".db");
+            Connection databaseConnection = DriverManager.getConnection("jdbc:sqlite:" + databasePath);
             printCreatedSuccessfullyMessage("Database");
             // create tables
             printCreatingMessage("Tables");
             Statement query = databaseConnection.createStatement();
-            query.execute(sql);
+            // sql
+            String sql = new String(readFromFile(new File("database/database_constructor.sql")));
+            String[] splitedSQL = sql.split(";");
+            for (String createTableSQL : splitedSQL) {
+                query.addBatch(createTableSQL + ";");
+            }
+            query.executeBatch();
+            query.close();
+            databaseConnection.close();
             printCreatedSuccessfullyMessage("Tables");
         } catch (SQLException e) {
             e.printStackTrace();
@@ -145,20 +178,26 @@ public class Author {
 
     }
 
-    public ArrayList<byte[]> getLicenseRequestsInCommunicationDirectory() {
+    public ArrayList<LicenseRequest> getLicenseRequestsInCommunicationDirectory() {
+        // get directory
         File directory = new File(getPathToCommunicationDirectory());
-        File[] licenseRequests = directory.listFiles((dir, file) -> file.endsWith(".license_request"));
-        ArrayList<byte[]> licenseRequestsBytes = new ArrayList<byte[]>();
-        assert licenseRequests != null;
-        for (File file : licenseRequests) {
-            licenseRequestsBytes.add(readFromFile(file));
+        // get files with the extension .license_request
+        File[] licenseRequestsFiles = directory.listFiles((dir, file) -> file.endsWith(".license_request"));
+        ArrayList<LicenseRequest> licenseRequests = new ArrayList<LicenseRequest>();
+        assert licenseRequestsFiles != null;
+        // read each file and delete
+        for (File file : licenseRequestsFiles) {
+            ByteArrayInputStream bis = new ByteArrayInputStream(readFromFile(file));
+            try {
+                ObjectInputStream ois = new ObjectInputStream(bis);
+                licenseRequests.add((LicenseRequest) ois.readObject());
+            } catch (IOException | ClassNotFoundException e) {
+                e.printStackTrace();
+            }
             file.delete();
         }
-        return licenseRequestsBytes;
-    }
-
-    public void processLicenseRequest(LicenseRequest licenseRequest){
-        
+        // return ArrayList of LicenseRequests
+        return licenseRequests;
     }
 
     public void init() {
@@ -176,9 +215,48 @@ public class Author {
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
+
+            // get all license requests in directory
             System.out.println(">[AUTHOR] Checking if there is new license requests...");
-            //check if file format is in the folder
-            ArrayList<byte[]> licenseRequest = getLicenseRequestsInCommunicationDirectory();
+            ArrayList<LicenseRequest> licenseRequests = getLicenseRequestsInCommunicationDirectory();
+
+            // process each license requests
+            for (LicenseRequest licenseRequest : licenseRequests) {
+                // check if valid license request, create license if true
+                if (licenseRequest.isValidLicenseRequest()) {
+                    // create license
+                    License license = new License(
+                            new LicenseParameters(
+                                    LocalDateTime.now().plusHours(getHoursUntilLicenseExpires()),
+                                    licenseRequest.getLicenseRequestParameters().getMachineIdentifiers(),
+                                    licenseRequest.getLicenseRequestParameters().getApplicationHash(),
+                                    licenseRequest.getLicenseRequestParameters().getCcCertificate()
+                            ),
+                            getEncryptedPrivateKey(),
+                            2
+                    );
+
+                    // add license parameters to database
+                    INSERT INTO users(public_key, certificate) VALUES(3, 3);
+
+                    INSERT INTO licenses(expiration_date, application_id, user_id) VALUES('29/01/2020', (SELECT id FROM applications WHERE hash = 1), (SELECT last_insert_rowid()));
+
+                    INSERT INTO machine_identifiers(licenses_id, hash) VALUES((SELECT last_insert_rowid()), 1);
+                    INSERT INTO machine_identifiers(licenses_id, hash) VALUES((SELECT licenses_id FROM machine_identifiers WHERE id = (SELECT last_insert_rowid())), 2);
+                    INSERT INTO machine_identifiers(licenses_id, hash) VALUES((SELECT licenses_id FROM machine_identifiers WHERE id = (SELECT last_insert_rowid())), 3);
+                    INSERT INTO machine_identifiers(licenses_id, hash) VALUES((SELECT licenses_id FROM machine_identifiers WHERE id = (SELECT last_insert_rowid())), 4);
+
+                    // encrypt license
+                    HybridEncryption encryptedLicense = new HybridEncryption(licenseRequest.getLicenseRequestParameters().getUserPublicKey());
+                    encryptedLicense.encrypt(license.toByteArray());
+
+                    // send encrypted license
+                    writeToFile(
+                            new File(getPathToCommunicationDirectory() + "/" + licenseRequest.toString() + ".license"),
+                            convertToByteArray(encryptedLicense)
+                    );
+                }
+            }
         }
     }
 }
