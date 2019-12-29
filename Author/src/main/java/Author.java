@@ -9,10 +9,10 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.*;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.security.cert.CertificateEncodingException;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.sql.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
@@ -20,15 +20,17 @@ import java.util.concurrent.TimeUnit;
 public class Author {
 
     private String pathToCommunicationDirectory;
-    private String password;
-    private byte[] encryptedPrivateKey;
-    private byte[] publicKey;
+    private String pathToDatabaseFile;
     private int hoursUntilLicenseExpires;
+    private String password;
+    private PasswordBasedEncryption encryptedPrivateKey;
+    private PublicKey publicKey;
 
-    public Author(String pathToCommunicationDirectory, String password, int hoursUntilLicenseExpires) {
+    public Author(String pathToCommunicationDirectory, String pathToDatabaseFile, int hoursUntilLicenseExpires, String password) {
         this.pathToCommunicationDirectory = pathToCommunicationDirectory;
-        this.password = password;
+        this.pathToDatabaseFile = pathToDatabaseFile;
         this.hoursUntilLicenseExpires = hoursUntilLicenseExpires;
+        this.password = password;
     }
 
     // +===+ Helper Methods +===+
@@ -89,28 +91,12 @@ public class Author {
         this.pathToCommunicationDirectory = pathToCommunicationDirectory;
     }
 
-    public String getPassword() {
-        return password;
+    public String getPathToDatabaseFile() {
+        return pathToDatabaseFile;
     }
 
-    public void setPassword(String password) {
-        this.password = password;
-    }
-
-    public byte[] getEncryptedPrivateKey() {
-        return encryptedPrivateKey;
-    }
-
-    public void setEncryptedPrivateKey(byte[] encryptedPrivateKey) {
-        this.encryptedPrivateKey = encryptedPrivateKey;
-    }
-
-    public byte[] getPublicKey() {
-        return publicKey;
-    }
-
-    public void setPublicKey(byte[] publicKey) {
-        this.publicKey = publicKey;
+    public void setPathToDatabaseFile(String pathToDatabaseFile) {
+        this.pathToDatabaseFile = pathToDatabaseFile;
     }
 
     public int getHoursUntilLicenseExpires() {
@@ -121,6 +107,29 @@ public class Author {
         this.hoursUntilLicenseExpires = hoursUntilLicenseExpires;
     }
 
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
+    }
+
+    public PasswordBasedEncryption getEncryptedPrivateKey() {
+        return encryptedPrivateKey;
+    }
+
+    public void setEncryptedPrivateKey(PasswordBasedEncryption encryptedPrivateKey) {
+        this.encryptedPrivateKey = encryptedPrivateKey;
+    }
+
+    public PublicKey getPublicKey() {
+        return publicKey;
+    }
+
+    public void setPublicKey(PublicKey publicKey) {
+        this.publicKey = publicKey;
+    }
     // +======+
 
     // +===+ Class Methods +===+
@@ -128,16 +137,105 @@ public class Author {
         PasswordBasedEncryption encryptedPrivateKey = new PasswordBasedEncryption("AES", "CBC", "PKCS5Padding", 65536, 256);
         SecretKey secretKey = encryptedPrivateKey.createSecretKey(getPassword().toCharArray());
         encryptedPrivateKey.encrypt(secretKey, privateKey.getEncoded());
-        setEncryptedPrivateKey(encryptedPrivateKey.getEncryptedInformation());
+        setEncryptedPrivateKey(encryptedPrivateKey);
+    }
+
+    public PrivateKey decryptPrivateKey(char[] password) {
+        SecretKey secretKey = getEncryptedPrivateKey().createSecretKey(password);
+        PrivateKey privateKey = null;
+        try {
+            privateKey = KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(getEncryptedPrivateKey().decrypt(secretKey)));
+        } catch (InvalidKeySpecException | NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
+        return privateKey;
+    }
+
+    public void addLicenseToDatabase(License license, LicenseRequest licenseRequest) {
+        try {
+            Connection databaseConnection = DriverManager.getConnection("jdbc:sqlite:" + getPathToDatabaseFile());
+            databaseConnection.setAutoCommit(false);
+            PreparedStatement insertUser = databaseConnection.prepareStatement("INSERT INTO users(public_key, certificate) VALUES(?, ?);");
+            insertUser.setBytes(1, licenseRequest.getLicenseRequestParameters().getUserPublicKey().getEncoded());
+            insertUser.setBytes(2, licenseRequest.getLicenseRequestParameters().getCcCertificate().getEncoded());
+            insertUser.executeUpdate();
+
+            PreparedStatement insertLicense = databaseConnection.prepareStatement("INSERT INTO licenses(expiration_date, application_id, user_id) VALUES(?, (SELECT id FROM applications WHERE hash = ?), (SELECT last_insert_rowid()));");
+            insertLicense.setDate(1, Date.valueOf(LocalDateTime.now().plusHours(getHoursUntilLicenseExpires()).toLocalDate()));
+            insertLicense.setBytes(2, license.getLicenseParameters().getApplicationHash());
+            insertLicense.executeUpdate();
+
+            byte[][] machineIdentifiers = license.getLicenseParameters().getMachineIdentifiers();
+            PreparedStatement insertMachineIdentifier1 = databaseConnection.prepareStatement("INSERT INTO machine_identifiers(licenses_id, hash) VALUES((SELECT last_insert_rowid()), ?);");
+            insertMachineIdentifier1.setBytes(1, machineIdentifiers[0]);
+            insertMachineIdentifier1.executeUpdate();
+
+            PreparedStatement insertMachineIdentifier2 = databaseConnection.prepareStatement("INSERT INTO machine_identifiers(licenses_id, hash) VALUES((SELECT licenses_id FROM machine_identifiers WHERE id = (SELECT last_insert_rowid())), ?);");
+            for (int index = 1; index < machineIdentifiers.length; index++) {
+                insertMachineIdentifier1.setBytes(1, machineIdentifiers[index]);
+                insertMachineIdentifier2.addBatch();
+            }
+            insertMachineIdentifier1.executeBatch();
+
+            databaseConnection.commit();
+            databaseConnection.close();
+        } catch (SQLException | CertificateEncodingException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void processEncryptedLicenseRequest(HybridEncryption encryptedLicenseRequest) {
+        // decrypt private key
+        PrivateKey privateKey = decryptPrivateKey(getPassword().toCharArray());
+
+        // decrypt license request
+        LicenseRequest licenseRequest = null;
+        ByteArrayInputStream bis = new ByteArrayInputStream(encryptedLicenseRequest.decrypt(privateKey));
+        try {
+            ObjectInputStream ois = new ObjectInputStream(bis);
+            licenseRequest = (LicenseRequest) ois.readObject();
+        } catch (IOException | ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+
+        // check if valid license request, create license if true
+        assert licenseRequest != null;
+        if (licenseRequest.isValidLicenseRequest()) {
+
+            // create license
+            License license = new License(
+                    new LicenseParameters(
+                            LocalDateTime.now().plusHours(getHoursUntilLicenseExpires()),
+                            licenseRequest.getLicenseRequestParameters().getMachineIdentifiers(),
+                            licenseRequest.getLicenseRequestParameters().getApplicationHash(),
+                            licenseRequest.getLicenseRequestParameters().getCcCertificate()
+                    ),
+                    privateKey,
+                    2
+            );
+
+            // add license parameters to database
+            addLicenseToDatabase(license, licenseRequest);
+
+            // encrypt license
+            cryptography.HybridEncryption encryptedLicense = new cryptography.HybridEncryption(licenseRequest.getLicenseRequestParameters().getUserPublicKey());
+            encryptedLicense.encrypt(license.toByteArray());
+
+            // send encrypted license
+            writeToFile(
+                    new File(getPathToCommunicationDirectory() + "/" + licenseRequest.toString() + ".license"),
+                    convertToByteArray(encryptedLicense)
+            );
+        }
+
+
     }
 
     public void createDatabase() {
-        // database name
-        String databasePath = "database/database.db";
         try {
             // create database
             printCreatingMessage("Database");
-            Connection databaseConnection = DriverManager.getConnection("jdbc:sqlite:" + databasePath);
+            Connection databaseConnection = DriverManager.getConnection("jdbc:sqlite:" + getPathToDatabaseFile());
             printCreatedSuccessfullyMessage("Database");
             // create tables
             printCreatingMessage("Tables");
@@ -169,7 +267,7 @@ public class Author {
         assert keyGenerator != null;
         keyGenerator.initialize(2048);
         KeyPair keyPair = keyGenerator.generateKeyPair();
-        setPublicKey(keyPair.getPublic().getEncoded());
+        setPublicKey(keyPair.getPublic());
         printCreatedSuccessfullyMessage("Key Pair");
         // protect private key
         printCreatingMessage("Encryption for the Private Key");
@@ -178,26 +276,26 @@ public class Author {
 
     }
 
-    public ArrayList<LicenseRequest> getLicenseRequestsInCommunicationDirectory() {
+    public ArrayList<HybridEncryption> getLicenseRequestsInCommunicationDirectory() {
         // get directory
         File directory = new File(getPathToCommunicationDirectory());
         // get files with the extension .license_request
         File[] licenseRequestsFiles = directory.listFiles((dir, file) -> file.endsWith(".license_request"));
-        ArrayList<LicenseRequest> licenseRequests = new ArrayList<LicenseRequest>();
+        ArrayList<HybridEncryption> encryptedLicenseRequests = new ArrayList<>();
         assert licenseRequestsFiles != null;
         // read each file and delete
         for (File file : licenseRequestsFiles) {
             ByteArrayInputStream bis = new ByteArrayInputStream(readFromFile(file));
             try {
                 ObjectInputStream ois = new ObjectInputStream(bis);
-                licenseRequests.add((LicenseRequest) ois.readObject());
+                encryptedLicenseRequests.add((HybridEncryption) ois.readObject());
             } catch (IOException | ClassNotFoundException e) {
                 e.printStackTrace();
             }
             file.delete();
         }
         // return ArrayList of LicenseRequests
-        return licenseRequests;
+        return encryptedLicenseRequests;
     }
 
     public void init() {
@@ -218,45 +316,13 @@ public class Author {
 
             // get all license requests in directory
             System.out.println(">[AUTHOR] Checking if there is new license requests...");
-            ArrayList<LicenseRequest> licenseRequests = getLicenseRequestsInCommunicationDirectory();
+            ArrayList<HybridEncryption> encryptedLicenseRequests = getLicenseRequestsInCommunicationDirectory();
 
-            // process each license requests
-            for (LicenseRequest licenseRequest : licenseRequests) {
-                // check if valid license request, create license if true
-                if (licenseRequest.isValidLicenseRequest()) {
-                    // create license
-                    License license = new License(
-                            new LicenseParameters(
-                                    LocalDateTime.now().plusHours(getHoursUntilLicenseExpires()),
-                                    licenseRequest.getLicenseRequestParameters().getMachineIdentifiers(),
-                                    licenseRequest.getLicenseRequestParameters().getApplicationHash(),
-                                    licenseRequest.getLicenseRequestParameters().getCcCertificate()
-                            ),
-                            getEncryptedPrivateKey(),
-                            2
-                    );
-
-                    // add license parameters to database
-                    INSERT INTO users(public_key, certificate) VALUES(3, 3);
-
-                    INSERT INTO licenses(expiration_date, application_id, user_id) VALUES('29/01/2020', (SELECT id FROM applications WHERE hash = 1), (SELECT last_insert_rowid()));
-
-                    INSERT INTO machine_identifiers(licenses_id, hash) VALUES((SELECT last_insert_rowid()), 1);
-                    INSERT INTO machine_identifiers(licenses_id, hash) VALUES((SELECT licenses_id FROM machine_identifiers WHERE id = (SELECT last_insert_rowid())), 2);
-                    INSERT INTO machine_identifiers(licenses_id, hash) VALUES((SELECT licenses_id FROM machine_identifiers WHERE id = (SELECT last_insert_rowid())), 3);
-                    INSERT INTO machine_identifiers(licenses_id, hash) VALUES((SELECT licenses_id FROM machine_identifiers WHERE id = (SELECT last_insert_rowid())), 4);
-
-                    // encrypt license
-                    HybridEncryption encryptedLicense = new HybridEncryption(licenseRequest.getLicenseRequestParameters().getUserPublicKey());
-                    encryptedLicense.encrypt(license.toByteArray());
-
-                    // send encrypted license
-                    writeToFile(
-                            new File(getPathToCommunicationDirectory() + "/" + licenseRequest.toString() + ".license"),
-                            convertToByteArray(encryptedLicense)
-                    );
-                }
+            // process each encrypted license requests
+            for (HybridEncryption encryptedLicenseRequest : encryptedLicenseRequests) {
+                processEncryptedLicenseRequest(encryptedLicenseRequest);
             }
         }
     }
+}
 }

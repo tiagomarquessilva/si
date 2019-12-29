@@ -12,7 +12,7 @@ public class HybridEncryption implements Serializable {
     private PublicKey publicKey;
     private SymmetricEncryption symmetricEncryption;
     private byte[] encryptedSymmetricKey;
-    private byte[] encryptedInformation;
+    private PasswordBasedEncryption encryptedInformation;
 
     public HybridEncryption(PublicKey publicKey) {
         this.publicKey = publicKey;
@@ -43,11 +43,11 @@ public class HybridEncryption implements Serializable {
         this.encryptedSymmetricKey = encryptedSymmetricKey;
     }
 
-    public byte[] getEncryptedInformation() {
+    public PasswordBasedEncryption getEncryptedInformation() {
         return encryptedInformation;
     }
 
-    public void setEncryptedInformation(byte[] encryptedInformation) {
+    public void setEncryptedInformation(PasswordBasedEncryption encryptedInformation) {
         this.encryptedInformation = encryptedInformation;
     }
 

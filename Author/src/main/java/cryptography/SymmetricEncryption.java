@@ -4,7 +4,6 @@ import javax.crypto.*;
 import javax.crypto.spec.IvParameterSpec;
 import java.security.*;
 import java.security.spec.InvalidParameterSpecException;
-import java.util.Random;
 
 public class SymmetricEncryption {
     private String encryptionAlgorithm;
@@ -13,7 +12,7 @@ public class SymmetricEncryption {
     private int iterationCount;
     private int keyLength;
     private byte[] initialVector;
-    private byte[] encryptedInformation;
+    private PasswordBasedEncryption encryptedInformation;
 
     public SymmetricEncryption(String encryptionAlgorithm, String blockChainingMode, String padding, int iterationCount, int keyLength) {
         this.encryptionAlgorithm = encryptionAlgorithm;
@@ -73,11 +72,11 @@ public class SymmetricEncryption {
         this.initialVector = initialVector;
     }
 
-    public byte[] getEncryptedInformation() {
+    public PasswordBasedEncryption getEncryptedInformation() {
         return encryptedInformation;
     }
 
-    public void setEncryptedInformation(byte[] encryptedInformation) {
+    public void setEncryptedInformation(PasswordBasedEncryption encryptedInformation) {
         this.encryptedInformation = encryptedInformation;
     }
 
