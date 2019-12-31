@@ -7,8 +7,8 @@ import java.time.LocalDateTime;
 public class LicenseRequestParameters extends LicenseParameters{
     private PublicKey userPublicKey;
 
-    public LicenseRequestParameters(LocalDateTime expirationDate, byte[][] machineIdentifiers, byte[] applicationHash, PublicKey userPublicKey, Certificate userCcCertificate) {
-        super(expirationDate, machineIdentifiers, applicationHash, userCcCertificate);
+    public LicenseRequestParameters(byte[][] machineIdentifiers, byte[] applicationHash, PublicKey userPublicKey, Certificate userCcCertificate) {
+        super(null, machineIdentifiers, applicationHash, userCcCertificate);
         this.userPublicKey = userPublicKey;
     }
 
