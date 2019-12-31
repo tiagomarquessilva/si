@@ -45,4 +45,12 @@ public class PasswordBasedEncryption extends SymmetricEncryption {
         assert secretKey != null;
         return new SecretKeySpec(secretKey.getEncoded(), getEncryptionAlgorithm());
     }
+
+    public void encrypt(char[] password, byte[] vanillaInformation) {
+        encrypt(createSecretKey(password), vanillaInformation);
+    }
+
+    public byte[] decrypt(char[] password) {
+        return decrypt(createSecretKey(password));
+    }
 }

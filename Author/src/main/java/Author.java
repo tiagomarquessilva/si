@@ -135,16 +135,14 @@ public class Author {
     // +===+ Class Methods +===+
     public void encryptPrivateKey(PrivateKey privateKey) {
         PasswordBasedEncryption encryptedPrivateKey = new PasswordBasedEncryption("AES", "CBC", "PKCS5Padding", 65536, 256);
-        SecretKey secretKey = encryptedPrivateKey.createSecretKey(getPassword().toCharArray());
-        encryptedPrivateKey.encrypt(secretKey, privateKey.getEncoded());
+        encryptedPrivateKey.encrypt(getPassword().toCharArray(), privateKey.getEncoded());
         setEncryptedPrivateKey(encryptedPrivateKey);
     }
 
     public PrivateKey decryptPrivateKey(char[] password) {
-        SecretKey secretKey = getEncryptedPrivateKey().createSecretKey(password);
         PrivateKey privateKey = null;
         try {
-            privateKey = KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(getEncryptedPrivateKey().decrypt(secretKey)));
+            privateKey = KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(getEncryptedPrivateKey().decrypt(getPassword().toCharArray())));
         } catch (InvalidKeySpecException | NoSuchAlgorithmException e) {
             e.printStackTrace();
         }

@@ -12,7 +12,7 @@ public class SymmetricEncryption {
     private int iterationCount;
     private int keyLength;
     private byte[] initialVector;
-    private PasswordBasedEncryption encryptedInformation;
+    private byte[] encryptedInformation;
 
     public SymmetricEncryption(String encryptionAlgorithm, String blockChainingMode, String padding, int iterationCount, int keyLength) {
         this.encryptionAlgorithm = encryptionAlgorithm;
@@ -72,11 +72,11 @@ public class SymmetricEncryption {
         this.initialVector = initialVector;
     }
 
-    public PasswordBasedEncryption getEncryptedInformation() {
+    public byte[] getEncryptedInformation() {
         return encryptedInformation;
     }
 
-    public void setEncryptedInformation(PasswordBasedEncryption encryptedInformation) {
+    public void setEncryptedInformation(byte[] encryptedInformation) {
         this.encryptedInformation = encryptedInformation;
     }
 
