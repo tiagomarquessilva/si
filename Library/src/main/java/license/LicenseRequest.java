@@ -48,8 +48,6 @@ public class LicenseRequest implements Serializable{
     // +======+
 
     // +===+ Getters and Setters +===+
-
-    // +===+ Getters and Setters +===+
     public LicenseRequestParameters getLicenseRequestParameters() {
         return licenseRequestParameters;
     }
@@ -84,6 +82,10 @@ public class LicenseRequest implements Serializable{
     public boolean isValidLicenseRequest(){
         // TODO: Validar certificado aka escrever este método
         return isValidUserSignature();
+    }
+
+    public byte[] toByteArray(){
+        return convertToByteArray(this);
     }
     // +======+
 }

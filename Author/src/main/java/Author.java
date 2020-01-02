@@ -216,7 +216,7 @@ public class Author {
             addLicenseToDatabase(license, licenseRequest);
 
             // encrypt license
-            cryptography.HybridEncryption encryptedLicense = new cryptography.HybridEncryption(licenseRequest.getLicenseRequestParameters().getUserPublicKey());
+            HybridEncryption encryptedLicense = new HybridEncryption(licenseRequest.getLicenseRequestParameters().getUserPublicKey());
             encryptedLicense.encrypt(license.toByteArray());
 
             // send encrypted license
