@@ -2,6 +2,9 @@ package cryptography;
 
 import javax.crypto.*;
 import javax.crypto.spec.IvParameterSpec;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectOutputStream;
 import java.security.*;
 import java.security.spec.InvalidParameterSpecException;
 
@@ -114,5 +117,18 @@ public class SymmetricEncryption {
             e.printStackTrace();
         }
         return decryptedInformation;
+    }
+
+    public byte[] toByteArray() {
+        ByteArrayOutputStream bos = null;
+        try {
+            bos = new ByteArrayOutputStream();
+            ObjectOutputStream os = new ObjectOutputStream(bos);
+            os.writeObject(this);
+            os.flush();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return bos.toByteArray();
     }
 }

@@ -4,13 +4,14 @@ import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
+import java.io.Serializable;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.KeySpec;
 import java.util.Random;
 
-public class PasswordBasedEncryption extends SymmetricEncryption {
+public class PasswordBasedEncryption extends SymmetricEncryption implements Serializable {
     private byte[] salt;
 
     public PasswordBasedEncryption(String encryptionAlgorithm, String blockChainingMode, String padding, int iterationCount, int keyLength) {

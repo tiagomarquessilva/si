@@ -15,6 +15,7 @@ import java.security.spec.PKCS8EncodedKeySpec;
 import java.sql.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.concurrent.TimeUnit;
 
 public class Author {
@@ -271,6 +272,9 @@ public class Author {
         printCreatingMessage("Encryption for the Private Key");
         encryptPrivateKey(keyPair.getPrivate());
         printCreatedSuccessfullyMessage("Encryption for the Private Key");
+        printCreatingMessage("File with Public Key");
+        writeToFile(new File(getPathToCommunicationDirectory() + "/author.public_key"), keyPair.getPublic().getEncoded());
+        printCreatedSuccessfullyMessage("File with Public Key");
 
     }
 
