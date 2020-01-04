@@ -5,10 +5,11 @@ import javax.crypto.spec.IvParameterSpec;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
+import java.io.Serializable;
 import java.security.*;
 import java.security.spec.InvalidParameterSpecException;
 
-public class SymmetricEncryption {
+public class SymmetricEncryption implements Serializable {
     private String encryptionAlgorithm;
     private String blockChainingMode;
     private String padding;

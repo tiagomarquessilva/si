@@ -11,7 +11,7 @@ import java.security.spec.InvalidKeySpecException;
 import java.security.spec.KeySpec;
 import java.util.Random;
 
-public class PasswordBasedEncryption extends SymmetricEncryption implements Serializable {
+public class PasswordBasedEncryption extends SymmetricEncryption {
     private byte[] salt;
 
     public PasswordBasedEncryption(String encryptionAlgorithm, String blockChainingMode, String padding, int iterationCount, int keyLength) {

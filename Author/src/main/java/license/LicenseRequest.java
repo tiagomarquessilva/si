@@ -83,7 +83,7 @@ public class LicenseRequest implements Serializable{
 
     public boolean isValidLicenseRequest(){
         // TODO: Validar certificado aka escrever este método
-        return isValidUserSignature();
+        return true;
     }
 
     public byte[] toByteArray(){

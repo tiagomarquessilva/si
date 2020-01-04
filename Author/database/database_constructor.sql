@@ -5,6 +5,13 @@ CREATE TABLE applications (
     hash blob NOT NULL
 );
 
+-- Table: key_pair
+CREATE TABLE key_pair (
+    id integer NOT NULL CONSTRAINT key_pair_pk PRIMARY KEY,
+    encrypted_private_key blob NOT NULL,
+    public_key blob NOT NULL
+);
+
 -- Table: licenses
 CREATE TABLE licenses (
     id integer NOT NULL CONSTRAINT licenses_pk PRIMARY KEY,
