@@ -44,12 +44,13 @@ public class Library {
 
         this.pathToApplication = pathToApplication;
         this.pathToCommunicationDirectory = pathToCommunicationDirectory;
+        createKeyPair();
 
         // add CC provider to Java
         Provider provider = Security.getProvider("SunPKCS11");
-        if(operatingSystem.equals("windows")){
+        if (operatingSystem.equals("windows")) {
             provider = provider.configure("pkcs11ccwin.cfg");
-        } else if (operatingSystem.equals("linux")){
+        } else if (operatingSystem.equals("linux")) {
             provider = provider.configure("pkcs11cclinux.cfg");
         }
         Security.addProvider(provider);
@@ -60,20 +61,9 @@ public class Library {
         } else {
             this.encryptedLicense = null;
         }
-        if (Files.exists(Paths.get("library.private_key")) && Files.exists(Paths.get("library.public_key"))) {
-            this.libraryPublicKey = getLibraryPublicKeyFromFile();
-            this.encryptedLibraryPrivateKey = getEncryptedLibraryPrivateKeyFromFile();
-        } else {
-            this.libraryPublicKey = null;
-            this.encryptedLibraryPrivateKey = null;
-        }
-        if (Files.exists(Paths.get(getPathToCommunicationDirectory() + "/author.public_key"))){
-            this.authorPublicKey = getAuthorPublicKeyFromFile();
-            signAuthorPublicKey();
-        } else {
-            this.authorPublicKey = null;
-            this.signedAuthorPublicKey = null;
-        }
+        this.authorPublicKey = getAuthorPublicKeyFromFile();
+        signAuthorPublicKey();
+
     }
 
     // +===+ Helper Methods +===+
@@ -110,67 +100,67 @@ public class Library {
     // +======+
     // +===+ Getters and Setters +===+
 
-    public HybridEncryption getEncryptedLicense() {
+    private HybridEncryption getEncryptedLicense() {
         return encryptedLicense;
     }
 
-    public void setEncryptedLicense(HybridEncryption encryptedLicense) {
+    private void setEncryptedLicense(HybridEncryption encryptedLicense) {
         this.encryptedLicense = encryptedLicense;
     }
 
-    public PasswordBasedEncryption getEncryptedLibraryPrivateKey() {
+    private PasswordBasedEncryption getEncryptedLibraryPrivateKey() {
         return encryptedLibraryPrivateKey;
     }
 
-    public void setEncryptedLibraryPrivateKey(PasswordBasedEncryption encryptedLibraryPrivateKey) {
+    private void setEncryptedLibraryPrivateKey(PasswordBasedEncryption encryptedLibraryPrivateKey) {
         this.encryptedLibraryPrivateKey = encryptedLibraryPrivateKey;
     }
 
-    public PublicKey getLibraryPublicKey() {
+    private PublicKey getLibraryPublicKey() {
         return libraryPublicKey;
     }
 
-    public void setLibraryPublicKey(PublicKey libraryPublicKey) {
+    private void setLibraryPublicKey(PublicKey libraryPublicKey) {
         this.libraryPublicKey = libraryPublicKey;
     }
 
-    public String getPathToApplication() {
+    private String getPathToApplication() {
         return pathToApplication;
     }
 
-    public void setPathToApplication(String pathToApplication) {
+    private void setPathToApplication(String pathToApplication) {
         this.pathToApplication = pathToApplication;
     }
 
-    public PublicKey getAuthorPublicKey() {
+    private PublicKey getAuthorPublicKey() {
         return authorPublicKey;
     }
 
-    public void setAuthorPublicKey(PublicKey authorPublicKey) {
+    private void setAuthorPublicKey(PublicKey authorPublicKey) {
         this.authorPublicKey = authorPublicKey;
     }
 
-    public byte[] getSignedAuthorPublicKey() {
+    private byte[] getSignedAuthorPublicKey() {
         return signedAuthorPublicKey;
     }
 
-    public void setSignedAuthorPublicKey(byte[] signedAuthorPublicKey) {
+    private void setSignedAuthorPublicKey(byte[] signedAuthorPublicKey) {
         this.signedAuthorPublicKey = signedAuthorPublicKey;
     }
 
-    public Provider getCitizenCardProvider() {
+    private Provider getCitizenCardProvider() {
         return citizenCardProvider;
     }
 
-    public void setCitizenCardProvider(Provider citizenCardProvider) {
+    private void setCitizenCardProvider(Provider citizenCardProvider) {
         this.citizenCardProvider = citizenCardProvider;
     }
 
-    public String getPathToCommunicationDirectory() {
+    private String getPathToCommunicationDirectory() {
         return pathToCommunicationDirectory;
     }
 
-    public void setPathToCommunicationDirectory(String pathToCommunicationDirectory) {
+    private void setPathToCommunicationDirectory(String pathToCommunicationDirectory) {
         this.pathToCommunicationDirectory = pathToCommunicationDirectory;
     }
 
@@ -192,19 +182,18 @@ public class Library {
         printCreatedSuccessfullyMessage("Key Pair");
         // protect private key
         printCreatingMessage("Encryption for the Private Key");
-        encryptUserPrivateKey(keyPair.getPrivate());
+        encryptLibraryPrivateKey(keyPair.getPrivate());
         printCreatedSuccessfullyMessage("Encryption for the Private Key");
 
     }
 
     private void signAuthorPublicKey() {
         try {
-            Signature signature = Signature.getInstance("SHA256withRSA", getCitizenCardProvider());
-            System.out.println("Priv:\t" + ((PrivateKey) getCitizenCardKeyPair().getKey("CITIZEN AUTHENTICATION CERTIFICATE", null)));
-            signature.initSign((PrivateKey) getCitizenCardKeyPair().getKey("CITIZEN AUTHENTICATION CERTIFICATE", null));
+            Signature signature = Signature.getInstance("SHA256withRSA");
+            signature.initSign(getCitizenCardPrivateKey());
             signature.update(getAuthorPublicKey().getEncoded());
             setSignedAuthorPublicKey(signature.sign());
-        } catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException | KeyStoreException | UnrecoverableKeyException e) {
+        } catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException e) {
             e.printStackTrace();
         }
     }
@@ -268,16 +257,6 @@ public class Library {
         return publicKey;
     }
 
-    private PublicKey getLibraryPublicKeyFromFile() {
-        PublicKey publicKey = null;
-        try {
-            publicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(readFromFile(new File("library.public_key"))));
-        } catch (InvalidKeySpecException | NoSuchAlgorithmException e) {
-            e.printStackTrace();
-        }
-        return publicKey;
-    }
-
     private PasswordBasedEncryption getEncryptedLibraryPrivateKeyFromFile() {
         PasswordBasedEncryption encryptedPrivateKey = null;
         ByteArrayInputStream bis = new ByteArrayInputStream(readFromFile(new File("library.private_key")));
@@ -302,7 +281,7 @@ public class Library {
         return encryptedLicense;
     }
 
-    private PrivateKey getDecryptedPrivateKey() {
+    private PrivateKey getDecryptedLibraryPrivateKey() {
         PrivateKey privateKey = null;
         try {
             privateKey = KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(getEncryptedLibraryPrivateKey().decrypt(getPassword())));
@@ -314,7 +293,7 @@ public class Library {
 
     private License getDecryptedLicense() {
         License license = null;
-        ByteArrayInputStream bis = new ByteArrayInputStream(getEncryptedLicense().decrypt(getDecryptedPrivateKey()));
+        ByteArrayInputStream bis = new ByteArrayInputStream(getEncryptedLicense().decrypt(getDecryptedLibraryPrivateKey()));
         try {
             ObjectInputStream ois = new ObjectInputStream(bis);
             license = (License) ois.readObject();
@@ -336,7 +315,7 @@ public class Library {
         return hashFactory.digest();
     }
 
-    private void encryptUserPrivateKey(PrivateKey privateKey) {
+    private void encryptLibraryPrivateKey(PrivateKey privateKey) {
         PasswordBasedEncryption encryptedPrivateKey = new PasswordBasedEncryption("AES", "CBC", "PKCS5Padding", 65536, 256);
         encryptedPrivateKey.encrypt(getPassword(), privateKey.getEncoded());
         setEncryptedLibraryPrivateKey(encryptedPrivateKey);
@@ -363,40 +342,50 @@ public class Library {
         return certificate;
     }
 
-    public boolean isValidAuthorPublicKey() {
-        boolean validSignature = false;
+    private PrivateKey getCitizenCardPrivateKey() {
+        PrivateKey privateKey = null;
         try {
-            Signature signature = Signature.getInstance("SHA256withRSA", getCitizenCardProvider());
-            System.out.println(getCitizenCardProvider().getInfo());
-            System.out.println("========");
-            signature.initVerify(getCitizenCardKeyPair().getCertificate("CITIZEN AUTHENTICATION CERTIFICATE"));
-            signature.update(getAuthorPublicKey().getEncoded());
-            validSignature = signature.verify(getSignedAuthorPublicKey());
-        } catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException | KeyStoreException e) {
+            privateKey = (PrivateKey) getCitizenCardKeyPair().getKey("CITIZEN AUTHENTICATION CERTIFICATE", null);
+        } catch (KeyStoreException | NoSuchAlgorithmException | UnrecoverableKeyException e) {
             e.printStackTrace();
         }
+        return privateKey;
+    }
+
+    private boolean isValidAuthorPublicKey() {
+        boolean validSignature = true;
+
+        try {
+            Signature signature = Signature.getInstance("SHA256withRSA");
+            signature.initVerify(getCitizenCardCertificate());
+            signature.update(getAuthorPublicKey().getEncoded());
+            validSignature = signature.verify(getSignedAuthorPublicKey());
+        } catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException e) {
+            e.printStackTrace();
+        }
+
         return validSignature;
     }
 
-    public void init(){
-        createKeyPair();
-        writeToFile(new File("library.private_key"), getEncryptedLibraryPrivateKey().toByteArray());
-        writeToFile(new File("library.public_key"), getLibraryPublicKey().getEncoded());
-    }
-
-    public boolean startRegistration() {
-        boolean successfulRegistration = false;
+    private void register() {
         if (isValidAuthorPublicKey()) {
-            // get CC private key
-            PrivateKey privateKey = null;
+            // create license request and sign
+            LicenseRequest licenseRequest = new LicenseRequest(new LicenseRequestParameters(getMachineIdentifiers(), getApplicationHash(), getLibraryPublicKey(), getCitizenCardCertificate()), getCitizenCardPrivateKey());
+
+            // print license request
+            System.out.println(">[LICENSE REQUEST]\tSignature:\t" + Base64.getEncoder().encodeToString(licenseRequest.getUserSignedLicenseRequestParameters()));
+            System.out.println(">[LICENSE REQUEST]\tMachine Identifiers:\t" +
+                    Base64.getEncoder().encodeToString(licenseRequest.getLicenseRequestParameters().getMachineIdentifiers()[0]) + " | " +
+                    Base64.getEncoder().encodeToString(licenseRequest.getLicenseRequestParameters().getMachineIdentifiers()[1]) + " | " +
+                    Base64.getEncoder().encodeToString(licenseRequest.getLicenseRequestParameters().getMachineIdentifiers()[2]) + " | " +
+                    Base64.getEncoder().encodeToString(licenseRequest.getLicenseRequestParameters().getMachineIdentifiers()[3]) + " | ");
+            System.out.println(">[LICENSE REQUEST]\tApplication:\t" + Base64.getEncoder().encodeToString(licenseRequest.getLicenseRequestParameters().getApplicationHash()));
+            System.out.println(">[LICENSE REQUEST]\tLibrary Public Key:\t" + Base64.getEncoder().encodeToString(licenseRequest.getLicenseRequestParameters().getUserPublicKey().getEncoded()));
             try {
-                privateKey = (PrivateKey) getCitizenCardKeyPair().getKey("CITIZEN AUTHENTICATION CERTIFICATE", null);
-            } catch (KeyStoreException | NoSuchAlgorithmException | UnrecoverableKeyException e) {
+                System.out.println(">[LICENSE REQUEST]\tCitizen Card Certificate:\t" + Base64.getEncoder().encodeToString(licenseRequest.getLicenseRequestParameters().getCcCertificate().getEncoded()));
+            } catch (CertificateEncodingException e) {
                 e.printStackTrace();
             }
-
-            // create license request
-            LicenseRequest licenseRequest = new LicenseRequest(new LicenseRequestParameters(getMachineIdentifiers(), getApplicationHash(), getLibraryPublicKey(), getCitizenCardCertificate()), privateKey);
 
             // encrypt license request
             HybridEncryption encryptedLicenseRequest = new HybridEncryption(getAuthorPublicKey());
@@ -430,29 +419,57 @@ public class Library {
             } catch (IOException | ClassNotFoundException e) {
                 e.printStackTrace();
             }
-            successfulRegistration = true;
         }
-        return successfulRegistration;
+    }
+
+    public boolean startRegistration() {
+        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+        boolean start = false;
+        printMessage("Application not registered. Do you which do register? (y/n)");
+        try {
+            switch (br.readLine()) {
+                case "y":
+                    printMessage("Registering Application...");
+                    Files.deleteIfExists(Paths.get("library.license"));
+                    register();
+                    start = true;
+                    break;
+                case "n":
+                    break;
+                default:
+                    printMessage("Invalid Answer! Please answer again.");
+                    start = startRegistration();
+                    break;
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return start;
     }
 
     public boolean isRegistered() {
-        return getDecryptedLicense().isValidLicense(getAuthorPublicKey(), getMachineIdentifiers(), getApplicationHash());
+        return getDecryptedLicense().isValidLicense(getAuthorPublicKey(), getMachineIdentifiers(), getApplicationHash(), getCitizenCardPrivateKey());
     }
 
     public void showLicenseInfo() {
-        License license = getDecryptedLicense();
-        System.out.println(">[LICENSE]\tSignature:\t" + Base64.getEncoder().encodeToString(license.getAuthorSignedLicenseParameters()));
-        System.out.println(">[LICENSE]\tExpiration Date:\t" + license.getLicenseParameters().getExpirationDate());
-        System.out.println(">[LICENSE]\tMachine Identifiers:\t" +
-                Base64.getEncoder().encodeToString(license.getLicenseParameters().getMachineIdentifiers()[0]) + " | " +
-                Base64.getEncoder().encodeToString(license.getLicenseParameters().getMachineIdentifiers()[1]) + " | " +
-                Base64.getEncoder().encodeToString(license.getLicenseParameters().getMachineIdentifiers()[2]) + " | " +
-                Base64.getEncoder().encodeToString(license.getLicenseParameters().getMachineIdentifiers()[3]) + " | ");
-        System.out.println(">[LICENSE]\tApplication:\t" + Base64.getEncoder().encodeToString(license.getLicenseParameters().getApplicationHash()));
-        try {
-            System.out.println(">[LICENSE]\tUser:\t" + Base64.getEncoder().encodeToString(license.getLicenseParameters().getCcCertificate().getEncoded()));
-        } catch (CertificateEncodingException e) {
-            e.printStackTrace();
+        if (Files.exists(Paths.get("library.license"))) {
+            License license = getDecryptedLicense();
+            System.out.println(">[LICENSE]\tSignature:\t" + Base64.getEncoder().encodeToString(license.getAuthorSignedLicenseParameters()));
+            System.out.println(">[LICENSE]\tExpiration Date:\t" + license.getLicenseParameters().getExpirationDate());
+            System.out.println(">[LICENSE]\tMachine Identifiers:\t" +
+                    Base64.getEncoder().encodeToString(license.getLicenseParameters().getMachineIdentifiers()[0]) + " | " +
+                    Base64.getEncoder().encodeToString(license.getLicenseParameters().getMachineIdentifiers()[1]) + " | " +
+                    Base64.getEncoder().encodeToString(license.getLicenseParameters().getMachineIdentifiers()[2]) + " | " +
+                    Base64.getEncoder().encodeToString(license.getLicenseParameters().getMachineIdentifiers()[3]) + " | ");
+            System.out.println(">[LICENSE]\tApplication:\t" + Base64.getEncoder().encodeToString(license.getLicenseParameters().getApplicationHash()));
+            try {
+                System.out.println(">[LICENSE]\tUser:\t" + Base64.getEncoder().encodeToString(license.getLicenseParameters().getCcCertificate().getEncoded()));
+            } catch (CertificateEncodingException e) {
+                e.printStackTrace();
+            }
+
+        } else {
+            printMessage("License does not exist!");
         }
     }
     // +======+

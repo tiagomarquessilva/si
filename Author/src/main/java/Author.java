@@ -38,12 +38,17 @@ public class Author {
         this.password = password;
 
         // create communication directory if not exists
-        if (Files.notExists(Paths.get(pathToCommunicationDirectory))){
+        if (Files.notExists(Paths.get(pathToCommunicationDirectory))) {
             try {
                 Files.createDirectory(Paths.get(pathToCommunicationDirectory));
             } catch (IOException e) {
                 e.printStackTrace();
             }
+        }
+
+        // init() if database not exists
+        if (Files.notExists(Paths.get(getPathToDatabaseFile()))) {
+            init();
         }
     }
 
@@ -327,7 +332,7 @@ public class Author {
             // send encrypted license
             printMessage("Sending Encrypted License to User...");
             writeToFile(
-                    new File(getPathToCommunicationDirectory() + "/"+ Arrays.hashCode(licenseRequest.getUserSignedLicenseRequestParameters()) +".license"),
+                    new File(getPathToCommunicationDirectory() + "/" + Arrays.hashCode(licenseRequest.getUserSignedLicenseRequestParameters()) + ".license"),
                     convertToByteArray(encryptedLicense)
             );
             printMessage("Sent Encrypted License to User");

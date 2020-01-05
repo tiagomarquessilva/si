@@ -5,8 +5,13 @@ import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.security.*;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateExpiredException;
+import java.security.cert.CertificateNotYetValidException;
+import java.security.cert.X509Certificate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.Random;
 
 public class License implements Serializable {
 
@@ -107,8 +112,39 @@ public class License implements Serializable {
         return Arrays.equals(getLicenseParameters().getApplicationHash(), currentApplicationHash);
     }
 
-    public boolean isValidLicense(PublicKey userPublicKey, byte[][] currentMachineIdentifiers, byte[] currentApplicationHash) {
-        return isValidAuthorSignature(userPublicKey) && isExpired() && isValidMachine(currentMachineIdentifiers) && isValidApplication(currentApplicationHash);
+    public boolean isValidUser(PrivateKey privateKey) {
+        boolean validSignature = false;
+
+        Random randomInts = new SecureRandom();
+        byte[] randomBytes = new byte[16];
+        randomInts.nextBytes(randomBytes);
+
+        X509Certificate x509Certificate = (X509Certificate) getLicenseParameters().getCcCertificate();
+        try {
+            x509Certificate.checkValidity();
+        } catch (CertificateExpiredException | CertificateNotYetValidException e) {
+            e.printStackTrace();
+        }
+
+        try {
+            Signature signature = Signature.getInstance("SHA256withRSA");
+            signature.initSign(privateKey);
+            signature.update(randomBytes);
+            byte[] signedBytes = signature.sign();
+
+            signature.initVerify(getLicenseParameters().getCcCertificate());
+            signature.update(randomBytes);
+            validSignature = signature.verify(signedBytes);
+
+        } catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException e) {
+            e.printStackTrace();
+        }
+
+        return validSignature;
+    }
+
+    public boolean isValidLicense(PublicKey authorPublicKey, byte[][] currentMachineIdentifiers, byte[] currentApplicationHash, PrivateKey currentUser) {
+        return isValidAuthorSignature(authorPublicKey) && isExpired() && isValidMachine(currentMachineIdentifiers) && isValidApplication(currentApplicationHash) && isValidUser(currentUser);
     }
 
     public byte[] toByteArray() {

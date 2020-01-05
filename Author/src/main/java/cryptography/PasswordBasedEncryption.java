@@ -38,8 +38,8 @@ public class PasswordBasedEncryption extends SymmetricEncryption {
         try {
             SecretKeyFactory keyFactory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
             KeySpec keySpec = new PBEKeySpec(password, getSalt(), getIterationCount(), getKeyLength());
-             secretKey = keyFactory.generateSecret(keySpec);
-        } catch (NoSuchAlgorithmException | InvalidKeySpecException e){
+            secretKey = keyFactory.generateSecret(keySpec);
+        } catch (NoSuchAlgorithmException | InvalidKeySpecException e) {
             e.printStackTrace();
         }
         assert secretKey != null;

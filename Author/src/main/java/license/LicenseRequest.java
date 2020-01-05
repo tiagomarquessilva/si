@@ -5,10 +5,12 @@ import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.security.*;
+import java.security.cert.*;
 import java.security.cert.Certificate;
-import java.security.cert.CertificateEncodingException;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
+import java.util.Arrays;
+import java.util.Random;
 
 public class LicenseRequest implements Serializable{
     private LicenseRequestParameters licenseRequestParameters;
@@ -48,8 +50,6 @@ public class LicenseRequest implements Serializable{
     // +======+
 
     // +===+ Getters and Setters +===+
-
-    // +===+ Getters and Setters +===+
     public LicenseRequestParameters getLicenseRequestParameters() {
         return licenseRequestParameters;
     }
@@ -81,9 +81,29 @@ public class LicenseRequest implements Serializable{
         return validSignature;
     }
 
-    public boolean isValidLicenseRequest(){
-        // TODO: Validar certificado aka escrever este método
+    public boolean isValidCertificate(){
+        X509Certificate x509Certificate = (X509Certificate) getLicenseRequestParameters().getCcCertificate();
+        try {
+            x509Certificate.checkValidity();
+        } catch (CertificateExpiredException | CertificateNotYetValidException e) {
+            e.printStackTrace();
+        }
         return true;
+    }
+
+    public boolean isValidApplication(byte[][] possibleApplications){
+        boolean validApplication = false;
+        int index = 0;
+        while (!validApplication && index < possibleApplications.length){
+            if (Arrays.equals(getLicenseRequestParameters().getApplicationHash(), possibleApplications[index])){
+                validApplication = true;
+            }
+        }
+        return validApplication;
+    }
+
+    public boolean isValidLicenseRequest(byte[][] possibleApplications){
+        return isValidUserSignature() && isValidCertificate() && isValidApplication(possibleApplications);
     }
 
     public byte[] toByteArray(){
