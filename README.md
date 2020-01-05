@@ -23,6 +23,7 @@ que apenas são executadas pelos donos legítimos das mesmas. Uma descrição ma
 ## Documentação
 
 - [Enunciado](Enunciado.pdf).
+- [Relatorio](Relatorio.pdf).
 
 ## Autores
 
