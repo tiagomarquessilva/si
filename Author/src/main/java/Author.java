@@ -3,6 +3,7 @@ import cryptography.PasswordBasedEncryption;
 import license.License;
 import license.LicenseParameters;
 import license.LicenseRequest;
+import org.zeroturnaround.zip.ZipUtil;
 
 import javax.crypto.SecretKey;
 import java.io.*;
@@ -300,9 +301,23 @@ public class Author {
             e.printStackTrace();
         }
 
+        // get applications from database (most efficient to left in memory but want to get better at JDBC)
+        ArrayList<byte[]> applicationsHash = new ArrayList<>();
+        try {
+            Connection databaseConnection = DriverManager.getConnection("jdbc:sqlite:" + getPathToDatabaseFile());
+            Statement query = databaseConnection.createStatement();
+            ResultSet results = query.executeQuery("SELECT hash FROM applications;");
+            while (results.next()){
+                applicationsHash.add(results.getBytes("hash"));
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
         // check if valid license request, create license if true
         assert licenseRequest != null;
-        if (licenseRequest.isValidLicenseRequest()) {
+        if (licenseRequest.isValidLicenseRequest(applicationsHash)) {
             printMessage("Valid License Request!");
             // create license
             printCreatingMessage("License");
@@ -366,7 +381,14 @@ public class Author {
             Connection databaseConnection = DriverManager.getConnection("jdbc:sqlite:" + getPathToDatabaseFile());
             PreparedStatement insertAppHash = databaseConnection.prepareStatement("INSERT INTO applications(hash) VALUES(?);");
             for (String application : getPathToApplications()) {
-                insertAppHash.setBytes(1, hashInformation(readFromFile(new File(application))));
+                File file = new File(application);
+                if (file.isDirectory()){
+                    ByteArrayOutputStream app = new ByteArrayOutputStream();
+                    ZipUtil.pack(file, app);
+                    insertAppHash.setBytes(1, hashInformation(app.toByteArray()));
+                } else {
+                    insertAppHash.setBytes(1, hashInformation(readFromFile(file)));
+                }
                 insertAppHash.addBatch();
             }
             insertAppHash.executeBatch();

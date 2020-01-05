@@ -3,6 +3,7 @@ import cryptography.PasswordBasedEncryption;
 import license.License;
 import license.LicenseRequest;
 import license.LicenseRequestParameters;
+import org.zeroturnaround.zip.ZipUtil;
 import oshi.SystemInfo;
 import oshi.hardware.ComputerSystem;
 import oshi.hardware.HardwareAbstractionLayer;
@@ -44,7 +45,6 @@ public class Library {
 
         this.pathToApplication = pathToApplication;
         this.pathToCommunicationDirectory = pathToCommunicationDirectory;
-        createKeyPair();
 
         // add CC provider to Java
         Provider provider = Security.getProvider("SunPKCS11");
@@ -61,8 +61,21 @@ public class Library {
         } else {
             this.encryptedLicense = null;
         }
-        this.authorPublicKey = getAuthorPublicKeyFromFile();
-        signAuthorPublicKey();
+        if (Files.exists(Paths.get("library.private_key")) && Files.exists(Paths.get("library.public_key"))) {
+            this.libraryPublicKey = getLibraryPublicKeyFromFile();
+            this.encryptedLibraryPrivateKey = getEncryptedLibraryPrivateKeyFromFile();
+        } else {
+            createKeyPair();
+            writeToFile(new File("library.private_key"), getEncryptedLibraryPrivateKey().toByteArray());
+            writeToFile(new File("library.public_key"), getLibraryPublicKey().getEncoded());
+        }
+        if (Files.exists(Paths.get(getPathToCommunicationDirectory() + "/author.public_key"))){
+            this.authorPublicKey = getAuthorPublicKeyFromFile();
+            signAuthorPublicKey();
+        } else {
+            this.authorPublicKey = null;
+            this.signedAuthorPublicKey = null;
+        }
 
     }
 
@@ -225,7 +238,16 @@ public class Library {
     }
 
     private byte[] getApplicationHash() {
-        return hashInformation(readFromFile(new File(getPathToApplication())));
+        byte[] hash = null;
+        File file = new File(getPathToApplication());
+        if (file.isDirectory()){
+            ByteArrayOutputStream app = new ByteArrayOutputStream();
+            ZipUtil.pack(file, app);
+            hash = hashInformation(app.toByteArray());
+        } else {
+            hash = hashInformation(readFromFile(file));
+        }
+        return hash;
     }
 
     private char[] getPassword() {
@@ -251,6 +273,16 @@ public class Library {
         PublicKey publicKey = null;
         try {
             publicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(readFromFile(new File(getPathToCommunicationDirectory() + "/author.public_key"))));
+        } catch (InvalidKeySpecException | NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
+        return publicKey;
+    }
+
+    private PublicKey getLibraryPublicKeyFromFile() {
+        PublicKey publicKey = null;
+        try {
+            publicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(readFromFile(new File("library.public_key"))));
         } catch (InvalidKeySpecException | NoSuchAlgorithmException e) {
             e.printStackTrace();
         }
@@ -448,7 +480,12 @@ public class Library {
     }
 
     public boolean isRegistered() {
-        return getDecryptedLicense().isValidLicense(getAuthorPublicKey(), getMachineIdentifiers(), getApplicationHash(), getCitizenCardPrivateKey());
+        boolean registered = false;
+        if (Files.exists(Paths.get("library.license"))){
+            registered = getDecryptedLicense().isValidLicense(getAuthorPublicKey(), getMachineIdentifiers(), getApplicationHash(), getCitizenCardPrivateKey());
+        }
+        return  registered;
+
     }
 
     public void showLicenseInfo() {

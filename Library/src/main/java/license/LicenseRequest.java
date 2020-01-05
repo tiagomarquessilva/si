@@ -9,10 +9,11 @@ import java.security.cert.*;
 import java.security.cert.Certificate;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Random;
 
-public class LicenseRequest implements Serializable{
+public class LicenseRequest implements Serializable {
     private LicenseRequestParameters licenseRequestParameters;
     private byte[] userSignedLicenseRequestParameters;
 
@@ -22,6 +23,10 @@ public class LicenseRequest implements Serializable{
     }
 
     // +===+ Helper Methods +==+
+    private void printMessage(String message) {
+        System.out.println(">[LICENSE REQUEST]\t" + message);
+    }
+
     private byte[] convertToByteArray(Object objectToConvert) {
         ByteArrayOutputStream bos = null;
         try {
@@ -35,7 +40,7 @@ public class LicenseRequest implements Serializable{
         return bos.toByteArray();
     }
 
-    private byte[] signLicenseRequest(PrivateKey privateKey){
+    private byte[] signLicenseRequest(PrivateKey privateKey) {
         byte[] signedLicenseRequestParameters = null;
         try {
             Signature signature = Signature.getInstance("SHA256withRSA");
@@ -72,41 +77,59 @@ public class LicenseRequest implements Serializable{
         boolean validSignature = false;
         try {
             Signature signature = Signature.getInstance("SHA256withRSA");
-            signature.initVerify(getLicenseRequestParameters().getUserPublicKey());
+            signature.initVerify(getLicenseRequestParameters().getCcCertificate());
             signature.update(convertToByteArray(getLicenseRequestParameters()));
             validSignature = signature.verify(getUserSignedLicenseRequestParameters());
         } catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException e) {
             e.printStackTrace();
         }
+
+        if (validSignature) {
+            printMessage("Valid signature");
+        } else {
+            printMessage("Invalid signature");
+        }
         return validSignature;
     }
 
-    public boolean isValidCertificate(){
+    public boolean isValidCertificate() {
         X509Certificate x509Certificate = (X509Certificate) getLicenseRequestParameters().getCcCertificate();
         try {
             x509Certificate.checkValidity();
         } catch (CertificateExpiredException | CertificateNotYetValidException e) {
             e.printStackTrace();
         }
+        printMessage("Valid certificate");
         return true;
     }
 
-    public boolean isValidApplication(byte[][] possibleApplications){
+    public boolean isValidApplication(ArrayList<byte[]> possibleApplications) {
         boolean validApplication = false;
         int index = 0;
-        while (!validApplication && index < possibleApplications.length){
-            if (Arrays.equals(getLicenseRequestParameters().getApplicationHash(), possibleApplications[index])){
+        while (!validApplication && index < possibleApplications.size()) {
+            if (Arrays.equals(getLicenseRequestParameters().getApplicationHash(), possibleApplications.get(index))) {
                 validApplication = true;
             }
+        }
+        if (validApplication){
+            printMessage("Valid Application");
+        } else {
+            printMessage("Invalid Application");
         }
         return validApplication;
     }
 
-    public boolean isValidLicenseRequest(byte[][] possibleApplications){
-        return isValidUserSignature() && isValidCertificate() && isValidApplication(possibleApplications);
+    public boolean isValidLicenseRequest(ArrayList<byte[]> possibleApplications) {
+        boolean valid = isValidUserSignature() && isValidCertificate() && isValidApplication(possibleApplications);
+        if (valid){
+            printMessage("Valid license request");
+        } else {
+            printMessage("Invalid license request");
+        }
+        return valid;
     }
 
-    public byte[] toByteArray(){
+    public byte[] toByteArray() {
         return convertToByteArray(this);
     }
     // +======+

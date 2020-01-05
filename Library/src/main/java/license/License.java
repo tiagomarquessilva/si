@@ -11,6 +11,7 @@ import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.X509Certificate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Random;
 
 public class License implements Serializable {
@@ -26,6 +27,10 @@ public class License implements Serializable {
     }
 
     // +===+ Helper Methods +==+
+    private void printMessage(String message) {
+        System.out.println(">[LICENSE]\t" + message);
+    }
+
     private byte[] convertToByteArray(Object objectToConvert) {
         ByteArrayOutputStream bos = null;
         try {
@@ -40,6 +45,7 @@ public class License implements Serializable {
     }
 
     private byte[] signLicense(PrivateKey privateKey) {
+        printMessage("Signing License...");
         byte[] signedLicenseParameters = null;
         try {
             Signature signature = Signature.getInstance("SHA256withRSA");
@@ -90,26 +96,52 @@ public class License implements Serializable {
         } catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException e) {
             e.printStackTrace();
         }
+        if (validSignature) {
+            printMessage("Valid signature");
+        } else {
+            printMessage("Invalid signature");
+        }
         return validSignature;
     }
 
     public boolean isExpired() {
-        return LocalDateTime.now().isBefore(getLicenseParameters().getExpirationDate());
+        boolean expired = LocalDateTime.now().isBefore(getLicenseParameters().getExpirationDate());
+        if (expired) {
+            printMessage("Not expired");
+        } else {
+            printMessage("Expired");
+        }
+        return expired;
     }
 
     public boolean isValidMachine(byte[][] currentMachineIdentifiers) {
-        int numberOfIdentifiersNotFound = 0;
-        for (byte[] machineIdentifier : currentMachineIdentifiers) {
-            if (!Arrays.asList(getLicenseParameters().getMachineIdentifiers()).contains(machineIdentifier)) {
-                numberOfIdentifiersNotFound++;
+        int numberOfIdentifiersFound = 0;
+        for (byte[] machineIdentifier1 : currentMachineIdentifiers) {
+            byte[][] machineIdentifiers = getLicenseParameters().getMachineIdentifiers();
+            for (byte[] machineIdentifier2 : machineIdentifiers) {
+                if (Arrays.equals(machineIdentifier1, machineIdentifier2)){
+                    numberOfIdentifiersFound++;
+                }
             }
         }
 
-        return numberOfIdentifiersNotFound >= getNumberOfMachineIdentifiersThatCanChange();
+        boolean valid = numberOfIdentifiersFound >= getNumberOfMachineIdentifiersThatCanChange();
+        if (valid) {
+            printMessage("Identical machine identifiers: " + numberOfIdentifiersFound + "/4. Maximum of different identifiers: " + getNumberOfMachineIdentifiersThatCanChange() + ". Valid");
+        } else {
+            printMessage("Identical machine identifiers: " + numberOfIdentifiersFound + "/4. Maximum of different identifiers: " + getNumberOfMachineIdentifiersThatCanChange() + ". Invalid");
+        }
+        return valid;
     }
 
     public boolean isValidApplication(byte[] currentApplicationHash) {
-        return Arrays.equals(getLicenseParameters().getApplicationHash(), currentApplicationHash);
+        boolean valid = Arrays.equals(getLicenseParameters().getApplicationHash(), currentApplicationHash);
+        if (valid) {
+            printMessage("Valid application");
+        } else {
+            printMessage("Invalid application");
+        }
+        return valid;
     }
 
     public boolean isValidUser(PrivateKey privateKey) {
@@ -125,6 +157,7 @@ public class License implements Serializable {
         } catch (CertificateExpiredException | CertificateNotYetValidException e) {
             e.printStackTrace();
         }
+        printMessage("Valid certificate");
 
         try {
             Signature signature = Signature.getInstance("SHA256withRSA");
@@ -140,11 +173,22 @@ public class License implements Serializable {
             e.printStackTrace();
         }
 
+        if (validSignature){
+            printMessage("Valid user");
+        } else {
+            printMessage("Invalid user");
+        }
         return validSignature;
     }
 
     public boolean isValidLicense(PublicKey authorPublicKey, byte[][] currentMachineIdentifiers, byte[] currentApplicationHash, PrivateKey currentUser) {
-        return isValidAuthorSignature(authorPublicKey) && isExpired() && isValidMachine(currentMachineIdentifiers) && isValidApplication(currentApplicationHash) && isValidUser(currentUser);
+        boolean valid = isValidAuthorSignature(authorPublicKey) && isExpired() && isValidMachine(currentMachineIdentifiers) && isValidApplication(currentApplicationHash) && isValidUser(currentUser);
+        if (valid){
+            printMessage("Valid license");
+        } else {
+            printMessage("Invalid license");
+        }
+        return valid;
     }
 
     public byte[] toByteArray() {
