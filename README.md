@@ -16,7 +16,9 @@ que apenas são executadas pelos donos legítimos das mesmas. Uma descrição ma
 
 ## Instalação
 
+1. Fazer o download da [Aplicação do Cartão de Cidadão](https://www.autenticacao.gov.pt/cc-aplicacao);
 1. Importar os projetos Author e Library para um IDE que suporte Maven;
+1. Na class [App](Library/src/main/java/App.java) da Library, alterar o atributo "operatingSystem" do construtor da class Library para o que está a utilizar;
 
 ## Documentação
 
